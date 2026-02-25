@@ -1,56 +1,68 @@
 import streamlit as st
-import whisper
-from transformers import pipeline
+from openai import OpenAI
 import tempfile
 
-st.set_page_config(page_title="Lecture Voice-to-Notes AI")
+# Page config
+st.set_page_config(
+    page_title="Lecture Voice-to-Notes AI",
+    page_icon="🎙",
+    layout="wide"
+)
 
 st.title("🎙 Lecture Voice-to-Notes AI")
-st.write("Upload lecture audio and generate transcript, summary, quiz, and flashcards.")
+st.markdown("Upload a lecture audio file and automatically generate transcript, summary, quiz questions, and flashcards.")
 
-@st.cache_resource
-def load_models():
-    whisper_model = whisper.load_model("tiny")
-    summarizer = pipeline(
-        "summarization",
-        model="sshleifer/distilbart-cnn-12-6"
-    )
-    return whisper_model, summarizer
+# Load OpenAI client using Streamlit secrets
+client = OpenAI(api_key=st.secrets["lecturetotranscript"])
 
-whisper_model, summarizer = load_models()
-
-uploaded_file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "mp4"])
+uploaded_file = st.file_uploader(
+    "Upload Audio File",
+    type=["mp3", "wav", "m4a"],
+)
 
 if uploaded_file:
-    with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(uploaded_file.read())
-        temp_path = tmp.name
 
-    st.info("Transcribing...")
+    with st.spinner("Transcribing audio..."):
+        # Save uploaded file temporarily
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
+            tmp_file.write(uploaded_file.read())
+            temp_path = tmp_file.name
 
-    result = whisper_model.transcribe(temp_path)
-    transcript = result["text"]
+        # Transcribe using OpenAI
+        with open(temp_path, "rb") as audio_file:
+            transcript_response = client.audio.transcriptions.create(
+                model="gpt-4o-mini-transcribe",
+                file=audio_file
+            )
 
-    st.subheader(" Transcript")
+        transcript = transcript_response.text
+
+    st.subheader("Transcript")
     st.write(transcript)
 
-    st.info("Generating summary...")
+    with st.spinner("Generating study materials..."):
 
-    summary = summarizer(transcript, max_length=200, min_length=50, do_sample=False)
-    notes = summary[0]["summary_text"]
+        prompt = f"""
+        From the following lecture transcript:
 
-    st.subheader(" Smart Summary")
-    st.write(notes)
+        {transcript}
 
-    sentences = transcript.split(".")
+        Generate:
+        1. A clean, structured study summary.
+        2. 5 quiz questions with answers.
+        3. 5 flashcards in Q/A format.
+        """
 
-    st.subheader(" Quiz Questions")
-    for i, s in enumerate(sentences[:5]):
-        st.write(f"Q{i+1}: Explain: {s.strip()}?")
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": prompt}
+            ]
+        )
 
-    st.subheader(" Flashcards")
-    for i, s in enumerate(sentences[:5]):
-        st.write(f"Flashcard {i+1}")
-        st.write(f"Front: {s.strip()}")
-        st.write("Back: Explanation")
-        st.write("---")
+        output = response.choices[0].message.content
+
+    st.subheader(" AI Generated Study Materials")
+    st.write(output)
+
+st.markdown("---")
