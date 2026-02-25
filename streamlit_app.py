@@ -14,10 +14,14 @@ GROQ_API_KEY = st.secrets["groq_key"]
 
 client = Groq(api_key=GROQ_API_KEY)
 
-uploaded_file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "m4a", "mp4"])
+uploaded_file = st.file_uploader(
+    "Upload Audio or Video",
+    type=["mp3", "wav", "m4a", "mp4"]
+)
 
 if uploaded_file:
 
+    # Save uploaded file temporarily
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
         tmp.write(uploaded_file.read())
         temp_path = tmp.name
@@ -26,12 +30,23 @@ if uploaded_file:
 
     headers = {"authorization": ASSEMBLY_API_KEY}
 
-    # Upload file
+    # Upload file to AssemblyAI
     upload_url = "https://api.assemblyai.com/v2/upload"
     with open(temp_path, "rb") as f:
-        upload_response = requests.post(upload_url, headers=headers, data=f)
+        upload_response = requests.post(
+            upload_url,
+            headers=headers,
+            data=f
+        )
 
-    audio_url = upload_response.json()["upload_url"]
+    upload_json = upload_response.json()
+
+    if "upload_url" not in upload_json:
+        st.error("Upload Error:")
+        st.write(upload_json)
+        st.stop()
+
+    audio_url = upload_json["upload_url"]
 
     # Request transcription
     transcript_request = {
@@ -39,21 +54,21 @@ if uploaded_file:
     }
 
     transcript_response = requests.post(
-    transcript_response = requests.post(
-    "https://api.assemblyai.com/v2/transcript",
-    json=transcript_request,
-    headers=headers
-)
+        "https://api.assemblyai.com/v2/transcript",
+        json=transcript_request,
+        headers=headers
+    )
 
-response_json = transcript_response.json()
+    response_json = transcript_response.json()
 
-if "id" not in response_json:
-    st.error("AssemblyAI Error:")
-    st.write(response_json)
-    st.stop()
+    if "id" not in response_json:
+        st.error("AssemblyAI Error:")
+        st.write(response_json)
+        st.stop()
 
-transcript_id = response_json["id"]
-    # Poll for result
+    transcript_id = response_json["id"]
+
+    # Poll for completion
     status = "processing"
     while status != "completed":
         polling = requests.get(
@@ -63,6 +78,11 @@ transcript_id = response_json["id"]
 
         status = polling["status"]
         time.sleep(3)
+
+        if status == "error":
+            st.error("Transcription Failed")
+            st.write(polling)
+            st.stop()
 
     transcript = polling["text"]
 
