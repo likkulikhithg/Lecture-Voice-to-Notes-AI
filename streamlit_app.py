@@ -6,7 +6,8 @@ import tempfile
 
 st.set_page_config(page_title="Lecture Voice-to-Notes AI")
 
-st.title("🎙 Lecture Voice-to-Notes AI (Fully Free Version)")
+st.title("Lecture Voice-to-Notes AI (Fully Free Version)")
+st.write("Upload audio or video and generate transcript, summary, quiz, and flashcards.")
 
 # Load API keys from Streamlit secrets
 ASSEMBLY_API_KEY = st.secrets["assembly_key"]
@@ -30,7 +31,7 @@ if uploaded_file:
 
     headers = {"authorization": ASSEMBLY_API_KEY}
 
-    # Upload file to AssemblyAI
+    # Upload file
     upload_url = "https://api.assemblyai.com/v2/upload"
     with open(temp_path, "rb") as f:
         upload_response = requests.post(
@@ -42,7 +43,7 @@ if uploaded_file:
     upload_json = upload_response.json()
 
     if "upload_url" not in upload_json:
-        st.error("Upload Error:")
+        st.error("Upload Error")
         st.write(upload_json)
         st.stop()
 
@@ -50,8 +51,8 @@ if uploaded_file:
 
     # Request transcription
     transcript_request = {
-    "audio_url": audio_url,
-    "speech_models": ["universal-2"]
+        "audio_url": audio_url,
+        "speech_models": ["universal-2"]
     }
 
     transcript_response = requests.post(
@@ -63,15 +64,15 @@ if uploaded_file:
     response_json = transcript_response.json()
 
     if "id" not in response_json:
-        st.error("AssemblyAI Error:")
+        st.error("AssemblyAI Error")
         st.write(response_json)
         st.stop()
 
     transcript_id = response_json["id"]
 
-    # Poll for completion
+    # Poll for transcription completion
     status = "processing"
-    while status != "completed":
+    while status not in ["completed", "error"]:
         polling = requests.get(
             f"https://api.assemblyai.com/v2/transcript/{transcript_id}",
             headers=headers
@@ -80,35 +81,43 @@ if uploaded_file:
         status = polling["status"]
         time.sleep(3)
 
-        if status == "error":
-            st.error("Transcription Failed")
-            st.write(polling)
-            st.stop()
+    if status == "error":
+        st.error("Transcription Failed")
+        st.write(polling)
+        st.stop()
 
     transcript = polling["text"]
 
-    st.subheader(" Transcript")
+    st.subheader("Transcript")
     st.write(transcript)
 
     st.info("Generating study materials using Groq...")
 
+    # Limit transcript size to prevent token overflow
+    short_transcript = transcript[:6000]
+
     prompt = f"""
-    From this lecture transcript:
+From this lecture transcript:
 
-    {transcript}
+{short_transcript}
 
-    Generate:
-    1. A clean structured summary
-    2. 5 quiz questions with answers
-    3. 5 flashcards (Q/A format)
-    """
+Generate:
+1. A clean structured summary
+2. 5 quiz questions with answers
+3. 5 flashcards (Q/A format)
+"""
 
-    chat_completion = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama3-8b-8192",
-    )
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="mixtral-8x7b-32768",
+        )
+    except Exception as e:
+        st.error("Groq Error")
+        st.write(str(e))
+        st.stop()
 
     result = chat_completion.choices[0].message.content
 
-    st.subheader(" Study Materials")
+    st.subheader("Study Materials")
     st.write(result)
