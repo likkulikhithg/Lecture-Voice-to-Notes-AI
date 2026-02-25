@@ -51,7 +51,7 @@ if uploaded_file:
     # Request transcription
     transcript_request = {
     "audio_url": audio_url,
-    "speech_model": "universal-2"
+    "speech_models": ["universal-2"]
     }
 
     transcript_response = requests.post(
