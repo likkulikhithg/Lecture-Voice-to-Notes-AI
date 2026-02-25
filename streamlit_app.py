@@ -113,7 +113,7 @@ Generate:
             messages=[
                 {"role": "user", "content": prompt}
             ],
-            model="llama3-8b-8192",   # Supported model
+            model="llama-3.1-8b-instant",
         )
     except Exception as e:
         st.error("Groq Error")
