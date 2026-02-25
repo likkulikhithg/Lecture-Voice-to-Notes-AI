@@ -16,8 +16,8 @@ st.markdown("Upload a lecture audio file and automatically generate transcript, 
 client = OpenAI(api_key=st.secrets["lecturetotranscript"])
 
 uploaded_file = st.file_uploader(
-    "Upload Audio File",
-    type=["mp3", "wav", "m4a"],
+    "Upload Audio or Video File",
+    type=["mp3", "wav", "m4a", "mp4"],
 )
 
 if uploaded_file:
