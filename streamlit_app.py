@@ -39,13 +39,20 @@ if uploaded_file:
     }
 
     transcript_response = requests.post(
-        "https://api.assemblyai.com/v2/transcript",
-        json=transcript_request,
-        headers=headers
-    )
+    transcript_response = requests.post(
+    "https://api.assemblyai.com/v2/transcript",
+    json=transcript_request,
+    headers=headers
+)
 
-    transcript_id = transcript_response.json()["id"]
+response_json = transcript_response.json()
 
+if "id" not in response_json:
+    st.error("AssemblyAI Error:")
+    st.write(response_json)
+    st.stop()
+
+transcript_id = response_json["id"]
     # Poll for result
     status = "processing"
     while status != "completed":
