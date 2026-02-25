@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Lecture AI Notes Generator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="container">
+
+    <div class="card">
+        <h1>🎙 Lecture Voice-to-Notes AI</h1>
+        <p class="subtitle">Convert lectures into smart study notes instantly</p>
+
+        <form method="POST" enctype="multipart/form-data">
+            <label class="upload-box">
+                <input type="file" name="audio" required>
+                 Upload Lecture Audio
+            </label>
+
+            <button type="submit" class="generate-btn">
+                Generate Notes
+            </button>
+        </form>
+    </div>
+
+    {% if transcript %}
+    <div class="results">
+
+        <div class="result-card">
+            <h2>Transcript</h2>
+            <p>{{ transcript }}</p>
+        </div>
+
+        <div class="result-card">
+            <h2>Smart Summary</h2>
+            <p>{{ notes }}</p>
+        </div>
+
+        <div class="result-card">
+            <h2>Quiz Questions</h2>
+            <pre>{{ quiz }}</pre>
+        </div>
+
+        <div class="result-card">
+            <h2>Flashcards</h2>
+            <pre>{{ flashcards }}</pre>
+        </div>
+
+    </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html>
