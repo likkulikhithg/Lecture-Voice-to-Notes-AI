@@ -1,68 +1,86 @@
 import streamlit as st
-from openai import OpenAI
+import requests
+import time
+from groq import Groq
 import tempfile
 
-# Page config
-st.set_page_config(
-    page_title="Lecture Voice-to-Notes AI",
-    page_icon="🎙",
-    layout="wide"
-)
+st.set_page_config(page_title="Lecture Voice-to-Notes AI")
 
-st.title("🎙 Lecture Voice-to-Notes AI")
-st.markdown("Upload a lecture audio file and automatically generate transcript, summary, quiz questions, and flashcards.")
+st.title("🎙 Lecture Voice-to-Notes AI (Fully Free Version)")
 
-# Load OpenAI client using Streamlit secrets
-client = OpenAI(api_key=st.secrets["lecturetotranscript"])
+# Load API keys from Streamlit secrets
+ASSEMBLY_API_KEY = st.secrets["assembly_key"]
+GROQ_API_KEY = st.secrets["groq_key"]
 
-uploaded_file = st.file_uploader(
-    "Upload Audio or Video File",
-    type=["mp3", "wav", "m4a", "mp4"],
-)
+client = Groq(api_key=GROQ_API_KEY)
+
+uploaded_file = st.file_uploader("Upload Audio or Video", type=["mp3", "wav", "m4a", "mp4"])
 
 if uploaded_file:
 
-    with st.spinner("Transcribing audio..."):
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_file:
-            tmp_file.write(uploaded_file.read())
-            temp_path = tmp_file.name
+    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+        tmp.write(uploaded_file.read())
+        temp_path = tmp.name
 
-        # Transcribe using OpenAI
-        with open(temp_path, "rb") as audio_file:
-            transcript_response = client.audio.transcriptions.create(
-                model="gpt-4o-mini-transcribe",
-                file=audio_file
-            )
+    st.info("Uploading to AssemblyAI...")
 
-        transcript = transcript_response.text
+    headers = {"authorization": ASSEMBLY_API_KEY}
 
-    st.subheader("Transcript")
+    # Upload file
+    upload_url = "https://api.assemblyai.com/v2/upload"
+    with open(temp_path, "rb") as f:
+        upload_response = requests.post(upload_url, headers=headers, data=f)
+
+    audio_url = upload_response.json()["upload_url"]
+
+    # Request transcription
+    transcript_request = {
+        "audio_url": audio_url
+    }
+
+    transcript_response = requests.post(
+        "https://api.assemblyai.com/v2/transcript",
+        json=transcript_request,
+        headers=headers
+    )
+
+    transcript_id = transcript_response.json()["id"]
+
+    # Poll for result
+    status = "processing"
+    while status != "completed":
+        polling = requests.get(
+            f"https://api.assemblyai.com/v2/transcript/{transcript_id}",
+            headers=headers
+        ).json()
+
+        status = polling["status"]
+        time.sleep(3)
+
+    transcript = polling["text"]
+
+    st.subheader(" Transcript")
     st.write(transcript)
 
-    with st.spinner("Generating study materials..."):
+    st.info("Generating study materials using Groq...")
 
-        prompt = f"""
-        From the following lecture transcript:
+    prompt = f"""
+    From this lecture transcript:
 
-        {transcript}
+    {transcript}
 
-        Generate:
-        1. A clean, structured study summary.
-        2. 5 quiz questions with answers.
-        3. 5 flashcards in Q/A format.
-        """
+    Generate:
+    1. A clean structured summary
+    2. 5 quiz questions with answers
+    3. 5 flashcards (Q/A format)
+    """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": prompt}
-            ]
-        )
+    chat_completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama3-8b-8192",
+    )
 
-        output = response.choices[0].message.content
+    result = chat_completion.choices[0].message.content
 
-    st.subheader(" AI Generated Study Materials")
-    st.write(output)
-
-st.markdown("---")
+    st.subheader(" Study Materials")
+    st.write(result)
