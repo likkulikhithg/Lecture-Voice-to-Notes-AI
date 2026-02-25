@@ -31,7 +31,7 @@ if uploaded_file:
 
     headers = {"authorization": ASSEMBLY_API_KEY}
 
-    # Upload file
+    # Upload file to AssemblyAI
     upload_url = "https://api.assemblyai.com/v2/upload"
     with open(temp_path, "rb") as f:
         upload_response = requests.post(
@@ -72,6 +72,7 @@ if uploaded_file:
 
     # Poll for transcription completion
     status = "processing"
+
     while status not in ["completed", "error"]:
         polling = requests.get(
             f"https://api.assemblyai.com/v2/transcript/{transcript_id}",
@@ -109,8 +110,10 @@ Generate:
 
     try:
         chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="mixtral-8x7b-32768",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            model="llama3-8b-8192",   # Supported model
         )
     except Exception as e:
         st.error("Groq Error")
